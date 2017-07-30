@@ -1,0 +1,31 @@
+{
+  "name": "rxjs-demo-starterkit",
+  "version": "1.0.0",
+  "license": "MIT",
+  "author": "Exequiel Ceasar Navarrete <exequiel.navarrete09@gmail.com>",
+  "scripts": {
+    "start": "webpack-dev-server --config ./webpack.config.dev.js",
+    "dev": "webpack-dev-server --config ./webpack.config.dev.js",
+    "build": "cross-env NODE_ENV=production webpack --colors --progress -p --config ./webpack.config.prod.js"
+  },
+  "private": true,
+  "dependencies": {
+    "babel-polyfill": "^6.23.0",
+    "rxjs": "^5.4.2"
+  },
+  "devDependencies": {
+    "babel-core": "^6.25.0",
+    "babel-loader": "^7.1.1",
+    "babel-preset-es2015": "^6.24.1",
+    "clean-webpack-plugin": "^0.1.16",
+    "copy-webpack-plugin": "^4.0.1",
+    "cross-env": "^5.0.1",
+    "css-loader": "^0.28.4",
+    "extract-text-webpack-plugin": "^3.0.0",
+    "style-loader": "^0.18.2",
+    "url-loader": "^0.5.9",
+    "webpack": "^3.4.1",
+    "webpack-dev-server": "^2.6.1",
+    "webpack-merge": "^4.1.0"
+  }
+}

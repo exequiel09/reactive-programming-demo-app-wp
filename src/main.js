@@ -51,14 +51,14 @@ mapClickStream$.subscribe(evt => {
 
 // [Marble Diagram] ::start
 //
-// Click Stream: -----------------c-------c---------c-----------------c-----------------c-----------------c------------------
-// Pluck       : --------------ltln----ltln------ltln--------------ltln--------------ltln--------------ltln------------------
-// Switch Map  : ---------------req-----req
-//                                         -------req---------------req---------------req---------------req------------------
-// Map (res)   : ----------------t1----------------t1----------------t1----------------t1----------------t1------------------
-// Map (obj)   : ----------------t2----------------t2----------------t2----------------t2----------------t2------------------
-// Map (html)  : ----------------t3----------------t3----------------t3----------------t3----------------t3------------------
-// Render (sub): -----------------r-----------------r-----------------r-----------------r-----------------r------------------
+// Click Stream     : -----------------c-------c---------c-----------------c-----------------c-----------------c------------------
+// Pluck            : --------------ltln----ltln------ltln--------------ltln--------------ltln--------------ltln------------------
+// Switch Map       : ---------------req-----req
+//                                              -------req-----------------X---------------req---------------req------------------
+// Map (obj - in)   :                 t1----------------t1----------------------------------t1----------------t1------------------
+// Map (html - in)  :                 t2----------------t2----------------------------------t2----------------t2------------------
+// Catch (in)       :                 -------------------------------------N------------------------------------------------------
+// Render (sub)     : -----------------r-----------------r-----------------r-----------------r-----------------r------------------
 //
 // [Marble Diagram] ::end
 
@@ -67,52 +67,51 @@ mapClickStream$
     .pluck('latlng')
 
     // perform ajax requests to the APIs and automatically unsubscribe to the previous request when another click is performed
-    .switchMap(({lat, lng}) => {
-        // create ajax observables and store them in an array
-        const observables = [
-            getAddress(lat, lng),
-            getSunriseSunset(lat, lng)
-        ];
-
-        // apply the source observables to the forkJoin operator get the the latest values
-        // combineLatest can also be used here. The difference? the answer can be found here
-        // <https://stackoverflow.com/questions/41797439/rxjs-observable-combinelatest-vs-observable-forkjoin#answer-41797505>
-        return Rx.Observable.forkJoin(...observables);
-    })
-
-    // get only the response key of the ajax requests
-    .map(res => res.map(resItem => resItem.response))
-
-    // transform the data to acceptable format
-    .map(([geocoding, sunriseAndSunset]) => {
-        // cast the sunset and sunrise values to a date object instance
-        if (
-            sunriseAndSunset.status.toLowerCase() === 'ok' &&
-            typeof sunriseAndSunset.results.sunrise !== 'undefined' &&
-            typeof sunriseAndSunset.results.sunset !== 'undefined'
-        ) {
-            sunriseAndSunset.results = Object.assign({}, sunriseAndSunset.results, {
-                sunrise: new Date(sunriseAndSunset.results.sunrise),
-                sunset: new Date(sunriseAndSunset.results.sunset),
-            })
-        }
-
-        // return the new data structure
-        return {
-            geocoding,
-            sunriseAndSunset
-        };
-    })
-
-    // compile the template
-    .map(data => compileTemplate(data))
-
-    // define a catch all mechanism
-    .catch(err => Rx.Observable.of("We have experienced some issues please try again later."))
+    .switchMap(({lat, lng}) => retrieveAndCompile(lat, lng))
 
     // set the marker content
     .subscribe(template => marker.setPopupContent(template))
     ;
+
+function retrieveAndCompile(lat, lng) {
+    const address$          = getAddress(lat, lng).pluck('response');
+    const sunriseAndSunset$ = getSunriseSunset(lat, lng).pluck('response');
+
+    // apply the source observables to the forkJoin operator to get the the latest values
+    // combineLatest can also be used here. The difference? the answer can be found here
+    // <https://stackoverflow.com/questions/41797439/rxjs-observable-combinelatest-vs-observable-forkjoin#answer-41797505>
+    const combined$ = Rx.Observable.forkJoin(address$, sunriseAndSunset$)
+        // transform the data to acceptable format
+        .map(([geocoding, sunriseAndSunset]) => {
+            // cast the sunset and sunrise values to a date object instance
+            if (
+                sunriseAndSunset.status.toLowerCase() === 'ok' &&
+                typeof sunriseAndSunset.results.sunrise !== 'undefined' &&
+                typeof sunriseAndSunset.results.sunset !== 'undefined'
+            ) {
+                sunriseAndSunset.results = Object.assign({}, sunriseAndSunset.results, {
+                    sunrise: new Date(sunriseAndSunset.results.sunrise),
+                    sunset: new Date(sunriseAndSunset.results.sunset),
+                })
+            }
+
+            // return the new data structure
+            return {
+                geocoding,
+                sunriseAndSunset
+            };
+        })
+
+        // compile the template
+        .map(data => compileTemplate(data))
+
+        // catch the error that will happen along the observable chain
+        .catch(() => Rx.Observable.of("We have experienced some issues please try again later."))
+        ;
+
+    // return the combined observable
+    return combined$;
+}
 
 function getAddress(lat, lng) {
     const endpoint = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=AIzaSyAi4LDku4WJGIC2f7xQJuRixTrwB3QL0yQ`;

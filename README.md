@@ -1,4 +1,4 @@
-# RxJS Demo Starter kit
+# Reactive Programming in RxJS Demo Application
 
 ## Requirements
 

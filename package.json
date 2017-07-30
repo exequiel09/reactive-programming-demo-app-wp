@@ -11,6 +11,8 @@
   "private": true,
   "dependencies": {
     "babel-polyfill": "^6.23.0",
+    "leaflet": "^1.1.0",
+    "normalize.css": "^7.0.0",
     "rxjs": "^5.4.2"
   },
   "devDependencies": {

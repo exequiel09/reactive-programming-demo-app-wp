@@ -131,6 +131,12 @@ async function retrieveAndCompile(lat, lng) {
         address          = JSON.parse(address);
         sunriseAndSunset = JSON.parse(sunriseAndSunset);
 
+        // cast the sunset and sunrise values to a date object instance
+        sunriseAndSunset.results = Object.assign({}, sunriseAndSunset.results, {
+            sunrise: new Date(sunriseAndSunset.results.sunrise),
+            sunset: new Date(sunriseAndSunset.results.sunset),
+        });
+
         // empty out http requests since all requests are now completed
         httpRequests = [];
 
@@ -165,7 +171,7 @@ function getAddress(lat, lng) {
 }
 
 function getSunriseSunset(lat, lng) {
-    const endpoint = `https://api.sunrise-sunset.org/json?lat=${lat}&lng=${lng}`;
+    const endpoint = `https://api.sunrise-sunset.org/json?lat=${lat}&lng=${lng}&formatted=0`;
 
     return http.request(endpoint, {
         method: 'get',

@@ -24,7 +24,7 @@ const http = {
 
         return Observable.ajax(opts);
     }
-}
+};
 
 const map = L.map('main-map', {});
 
@@ -104,7 +104,7 @@ function retrieveAndCompile(lat, lng) {
                 sunriseAndSunset.results = Object.assign({}, sunriseAndSunset.results, {
                     sunrise: new Date(sunriseAndSunset.results.sunrise),
                     sunset: new Date(sunriseAndSunset.results.sunset),
-                })
+                });
             }
 
             // return the new data structure

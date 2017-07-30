@@ -1,5 +1,15 @@
-import Rx from 'rxjs/Rx';
+import { Observable } from 'rxjs/Observable';
 import L from './leaflet-map';
+
+// rxjs observable monkey-patch
+import 'rxjs/add/observable/dom/ajax';
+import 'rxjs/add/observable/forkJoin';
+import 'rxjs/add/observable/fromEvent';
+import 'rxjs/add/operator/catch';
+import 'rxjs/add/operator/do';
+import 'rxjs/add/operator/map';
+import 'rxjs/add/operator/pluck';
+import 'rxjs/add/operator/switchMap';
 
 // stylesheets
 import 'normalize.css';
@@ -12,7 +22,7 @@ const http = {
             url
         });
 
-        return Rx.Observable.ajax(opts);
+        return Observable.ajax(opts);
     }
 }
 
@@ -31,7 +41,7 @@ const baseLayer = L.tileLayer('http://{s}.basemaps.cartocdn.com/light_all/{z}/{x
 map.setView([13, 122], 6);
 
 // listen to the click events on the map
-const mapClickStream$ = Rx.Observable.fromEvent(map, 'click');
+const mapClickStream$ = Observable.fromEvent(map, 'click');
 
 // [Marble Diagram] ::start
 //
@@ -82,7 +92,7 @@ function retrieveAndCompile(lat, lng) {
     // apply the source observables to the forkJoin operator to get the the latest values
     // combineLatest can also be used here. The difference? the answer can be found here
     // <https://stackoverflow.com/questions/41797439/rxjs-observable-combinelatest-vs-observable-forkjoin#answer-41797505>
-    const combined$ = Rx.Observable.forkJoin(address$, sunriseAndSunset$)
+    const combined$ = Observable.forkJoin(address$, sunriseAndSunset$)
         // transform the data to acceptable format
         .map(([geocoding, sunriseAndSunset]) => {
             // cast the sunset and sunrise values to a date object instance
@@ -108,7 +118,7 @@ function retrieveAndCompile(lat, lng) {
         .map(data => compileTemplate(data))
 
         // catch the error that will happen along the observable chain
-        .catch(() => Rx.Observable.of("We have experienced some issues please try again later."))
+        .catch(() => Observable.of("We have experienced some issues please try again later."))
         ;
 
     // return the combined observable

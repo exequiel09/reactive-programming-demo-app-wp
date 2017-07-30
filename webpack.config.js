@@ -27,10 +27,15 @@ module.exports = {
     },
 
     plugins: [
-        new ExtractTextPlugin('styles.css'),
         new webpack.optimize.CommonsChunkPlugin({
             name: 'vendor',
-            minChunks: ({ resource }) => /node_modules/.test(resource),
+            minChunks: ({ resource }) => {
+                return /node_modules/.test(resource) && !(/\.css/.test(resource));
+            },
+        }),
+        new ExtractTextPlugin({
+            filename: 'styles.css',
+            allChunks: true
         }),
     ],
 

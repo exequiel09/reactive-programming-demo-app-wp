@@ -1,3 +1,4 @@
+import Rx from 'rxjs/Rx';
 import L from './leaflet-map';
 
 // stylesheets
@@ -7,57 +8,11 @@ import './main.css';
 
 const http = {
     request: function(url, options) {
-        let xhr        = new XMLHttpRequest();
-        let xhrPromise = new Promise((resolve, reject) => {
-            // set the default http verb to get
-            let method = 'get';
-            if (typeof options.method !== 'undefined') {
-                method = options.method;
-            }
-
-            // The last parameter must be set to true to make an asynchronous request
-            xhr.open(method.toUpperCase(), url, true);
-
-            // apply the headers dynamically
-            if (typeof options.headers !== 'undefined' ) {
-                Object.keys(options.headers).forEach(function(headerKey) {
-                    xhr.setRequestHeader(headerKey, options.headers[headerKey]);
-                });
-            }
-
-            // process the onload event
-            xhr.onload = function() {
-                if (xhr.status >= 200 && xhr.status < 300) {
-                    if (typeof options.success !== 'undefined') {
-                        options.success(xhr.response);
-                    }
-
-                    // resolve the promise
-                    resolve(xhr.response);
-                } else {
-                    if (typeof options.fail !== 'undefined') {
-                        options.fail(xhr.status, "Error");
-                    }
-
-                    // reject the promise
-                    reject({
-                        error: xhr.response,
-                        message: "Error"
-                    });
-                }
-            };
-
-            // send the request
-            xhr.send();
+        const opts = Object.assign({}, options, {
+            url
         });
 
-        // add abort method to promise since cancellable promises are under discussion of tc39
-        // <https://github.com/tc39/proposal-cancelable-promises>
-        xhrPromise.abort = function() {
-            xhr.abort();
-        };
-
-        return xhrPromise;
+        return Rx.Observable.ajax(opts);
     }
 }
 
@@ -72,17 +27,13 @@ const baseLayer = L.tileLayer('http://{s}.basemaps.cartocdn.com/light_all/{z}/{x
 // set the center and zoom level of the map
 map.setView([13, 122], 6);
 
-// dynamically create markers
-let marker       = null;
-let httpRequests = [];
-map.on('click', function(evt) {
-    const mapInstance = this;
+// listen to the click events on the map
+const mapClickStream$ = Rx.Observable.fromEvent(map, 'click');
 
-    // abort the current http request and remove any references to it
-    if (httpRequests.length > 0) {
-        httpRequests.forEach(httpRequest => httpRequest.abort());
-        httpRequests = [];
-    }
+// add the marker to the map
+let marker = null;
+mapClickStream$.subscribe(evt => {
+    const mapInstance = evt.target;
 
     // remove the old marker and its popup before creating a new one
     if (marker !== null) {
@@ -92,78 +43,70 @@ map.on('click', function(evt) {
     }
 
     // create new marker and add it to the map where it is clicked
-    marker = L.marker([
-        evt.latlng.lat,
-        evt.latlng.lng
-    ]).addTo(map);
+    marker = L.marker(evt.latlng).addTo(map);
 
     // show add default marker content indicating status
     marker.bindPopup("<span>Loading data... Please wait..</span>").openPopup();
-
-    retrieveAndCompile(evt.latlng.lat, evt.latlng.lng)
-        .then(template => marker.setPopupContent(template))
-        ;
 });
 
-async function retrieveAndCompile(lat, lng) {
-    let template = "";
+mapClickStream$
+    // extract `latlng` property from the event object
+    .pluck('latlng')
 
-    try {
-        let address = await (() => {
-            const request = getAddress(lat, lng);
+    // perform ajax requests to the APIs and automatically unsubscribe to the previous request when another click is performed
+    .switchMap(({lat, lng}) => {
+        // create ajax observables and store them in an array
+        const observables = [
+            getAddress(lat, lng),
+            getSunriseSunset(lat, lng)
+        ];
 
-            // add to the httpRequests array
-            httpRequests.push(request);
+        // apply the source observables to the forkJoin operator get the the latest values
+        // combineLatest can also be used here. The difference? the answer can be found here
+        // <https://stackoverflow.com/questions/41797439/rxjs-observable-combinelatest-vs-observable-forkjoin#answer-41797505>
+        return Rx.Observable.forkJoin(...observables);
+    })
 
-            return request;
-        })();
+    // get only the response key of the ajax requests
+    .map(res => res.map(resItem => resItem.response))
 
-        let sunriseAndSunset = await (() => {
-            const request = getSunriseSunset(lat, lng);
-
-            // add to the httpRequests array
-            httpRequests.push(request);
-
-            return request;
-        })();
-
-        // parse the returned result from the api
-        address          = JSON.parse(address);
-        sunriseAndSunset = JSON.parse(sunriseAndSunset);
-
+    // transform the data to acceptable format
+    .map(([geocoding, sunriseAndSunset]) => {
         // cast the sunset and sunrise values to a date object instance
-        sunriseAndSunset.results = Object.assign({}, sunriseAndSunset.results, {
-            sunrise: new Date(sunriseAndSunset.results.sunrise),
-            sunset: new Date(sunriseAndSunset.results.sunset),
-        });
-
-        // empty out http requests since all requests are now completed
-        httpRequests = [];
-
-        template = compileTemplate({
-            geocoding: address,
-            sunriseAndSunset: sunriseAndSunset
-        });
-    } catch(err) {
-        console.log(`Aborting promise. Error occured: ${err.message}`);
-
-        // abort the current http request and remove any references to it
-        if (httpRequests.length > 0) {
-            httpRequests.forEach(httpRequest => httpRequest.abort());
-            httpRequests = [];
+        if (
+            sunriseAndSunset.status.toLowerCase() === 'ok' &&
+            typeof sunriseAndSunset.results.sunrise !== 'undefined' &&
+            typeof sunriseAndSunset.results.sunset !== 'undefined'
+        ) {
+            sunriseAndSunset.results = Object.assign({}, sunriseAndSunset.results, {
+                sunrise: new Date(sunriseAndSunset.results.sunrise),
+                sunset: new Date(sunriseAndSunset.results.sunset),
+            })
         }
 
-        template = "We have experienced some issues please try again later.";
-    }
+        // return the new data structure
+        return {
+            geocoding,
+            sunriseAndSunset
+        };
+    })
 
-    return template;
-}
+    // compile the template
+    .map(data => compileTemplate(data))
+
+    // define a catch all mechanism
+    .catch(err => Rx.Observable.of("We have experienced some issues please try again later."))
+
+    // set the marker content
+    .subscribe(template => marker.setPopupContent(template))
+    ;
 
 function getAddress(lat, lng) {
     const endpoint = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=AIzaSyAi4LDku4WJGIC2f7xQJuRixTrwB3QL0yQ`;
 
     return http.request(endpoint, {
-        method: 'get',
+        method: 'GET',
+        crossDomain: true,
         headers: {
             'Accept': 'application/json'
         }
@@ -174,7 +117,8 @@ function getSunriseSunset(lat, lng) {
     const endpoint = `https://api.sunrise-sunset.org/json?lat=${lat}&lng=${lng}&formatted=0`;
 
     return http.request(endpoint, {
-        method: 'get',
+        method: 'GET',
+        crossDomain: true,
         headers: {
             'Accept': 'application/json'
         }

@@ -18,6 +18,9 @@ const http = {
 
 const map = L.map('main-map', {});
 
+// will be used to store the instance of the newly created marker
+let marker = null;
+
 // create a base layer and add it to the map
 const baseLayer = L.tileLayer('http://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', {
     attribution: `Map data &copy; <a href="http://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors,
@@ -29,25 +32,6 @@ map.setView([13, 122], 6);
 
 // listen to the click events on the map
 const mapClickStream$ = Rx.Observable.fromEvent(map, 'click');
-
-// add the marker to the map
-let marker = null;
-mapClickStream$.subscribe(evt => {
-    const mapInstance = evt.target;
-
-    // remove the old marker and its popup before creating a new one
-    if (marker !== null) {
-        marker.unbindPopup();
-        marker.removeFrom(mapInstance);
-        marker = null;
-    }
-
-    // create new marker and add it to the map where it is clicked
-    marker = L.marker(evt.latlng).addTo(map);
-
-    // show add default marker content indicating status
-    marker.bindPopup("<span>Loading data... Please wait..</span>").openPopup();
-});
 
 // [Marble Diagram] ::start
 //
@@ -63,6 +47,24 @@ mapClickStream$.subscribe(evt => {
 // [Marble Diagram] ::end
 
 mapClickStream$
+    // add the marker to the map (SIDE EFFECT)
+    .do(evt => {
+        const mapInstance = evt.target;
+
+        // remove the old marker and its popup before creating a new one
+        if (marker !== null) {
+            marker.unbindPopup();
+            marker.removeFrom(mapInstance);
+            marker = null;
+        }
+
+        // create new marker and add it to the map where it is clicked
+        marker = L.marker(evt.latlng).addTo(map);
+
+        // show add default marker content indicating status
+        marker.bindPopup("<span>Loading data... Please wait..</span>").openPopup();
+    })
+
     // extract `latlng` property from the event object
     .pluck('latlng')
 

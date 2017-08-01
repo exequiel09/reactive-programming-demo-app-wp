@@ -5,6 +5,7 @@ import L from './leaflet-map';
 import 'rxjs/add/observable/dom/ajax';
 import 'rxjs/add/observable/forkJoin';
 import 'rxjs/add/observable/fromEvent';
+import 'rxjs/add/observable/of';
 import 'rxjs/add/operator/catch';
 import 'rxjs/add/operator/do';
 import 'rxjs/add/operator/map';

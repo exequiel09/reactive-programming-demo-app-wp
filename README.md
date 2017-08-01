@@ -1,4 +1,4 @@
-# RxJS Demo Starter kit
+# Reactive Programming in RxJS Demo Application
 
 ## Requirements
 
@@ -15,7 +15,7 @@ Installing dependencies via Yarn is simply as running the command `yarn install`
 ## Running the Program
 
 This program can be run using the command `yarn start` if you use Yarn or `npm start` if you use NPM.
-This will spawn a server and will be accessible at [http://localhost:3001](http://localhost:3001)
+This will spawn a server and will be accessible at [http://localhost:9000](http://localhost:9000)
 
 ## License
 
